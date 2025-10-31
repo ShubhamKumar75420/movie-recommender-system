@@ -2,9 +2,10 @@ import streamlit as st
 import pickle
 import requests
 import time
-import os
 import gzip
 import io
+import os
+import gc
 
 # ---------------- Page Config ----------------
 st.set_page_config(
@@ -102,45 +103,55 @@ def fetch_poster(movie_id, movie_name=None, session=None):
             return "https://image.tmdb.org/t/p/w500" + poster_path
         else:
             return "https://via.placeholder.com/500x750.png?text=No+Image"
-    except requests.exceptions.RequestException:
+    except Exception:
         return "https://via.placeholder.com/500x750.png?text=Error"
 
 # ---------------- Safe Data Loader ----------------
-@st.cache_data(show_spinner=False)
+@st.cache_resource(show_spinner=False)
 def load_data():
+    """Optimized for memory and caching"""
     with open('movie_list.pkl', 'rb') as f:
         movies = pickle.load(f)
 
-    with gzip.open('similarity.pkl.gz', 'rb') as f:
-        data = f.read()
-        similarity = pickle.load(io.BytesIO(data))
+    # Using gzip (if available) for smaller memory footprint
+    if os.path.exists('similarity.pkl.gz'):
+        with gzip.open('similarity.pkl.gz', 'rb') as f:
+            similarity = pickle.load(f)
+    else:
+        with open('similarity.pkl', 'rb') as f:
+            similarity = pickle.load(f)
 
+    gc.collect()  # free unused memory
     return movies, similarity
 
 movies, similarity = load_data()
 
 # ---------------- Recommendation Logic ----------------
 def recommend(movie):
-    index = movies[movies['title'] == movie].index[0]
-    distances = sorted(
-        list(enumerate(similarity[index])),
-        reverse=True,
-        key=lambda x: x[1]
-    )
+    try:
+        index = movies[movies['title'] == movie].index[0]
+        distances = sorted(
+            list(enumerate(similarity[index])),
+            reverse=True,
+            key=lambda x: x[1]
+        )
 
-    recommended_movie_names = []
-    recommended_movie_posters = []
-    session = requests.Session()
+        recommended_movie_names = []
+        recommended_movie_posters = []
+        session = requests.Session()
 
-    for i in distances[1:6]:
-        movie_id = movies.iloc[i[0]].movie_id
-        movie_name = movies.iloc[i[0]].title
-        poster = fetch_poster(movie_id, movie_name, session=session)
-        recommended_movie_posters.append(poster)
-        recommended_movie_names.append(movie_name)
-        time.sleep(0.2)
+        for i in distances[1:6]:
+            movie_id = movies.iloc[i[0]].movie_id
+            movie_name = movies.iloc[i[0]].title
+            poster = fetch_poster(movie_id, movie_name, session=session)
+            recommended_movie_posters.append(poster)
+            recommended_movie_names.append(movie_name)
+            time.sleep(0.15)  # reduce load
 
-    return recommended_movie_names, recommended_movie_posters
+        return recommended_movie_names, recommended_movie_posters
+    except Exception as e:
+        st.error(f"⚠️ Error: {e}")
+        return [], []
 
 # ---------------- Streamlit UI ----------------
 st.title("🎥 Movie Recommender System")
@@ -152,12 +163,13 @@ selected_movie = st.selectbox("🎬 Type or select a movie", movie_list)
 if st.button('Show Recommendation 🎞️'):
     with st.spinner('🍿 Fetching recommendations...'):
         names, posters = recommend(selected_movie)
-        cols = st.columns(5)
-        for i in range(5):
-            with cols[i]:
-                st.markdown('<div class="movie-card">', unsafe_allow_html=True)
-                st.image(posters[i], caption=names[i])
-                st.markdown('</div>', unsafe_allow_html=True)
+        if names:
+            cols = st.columns(len(names))
+            for i, col in enumerate(cols):
+                with col:
+                    st.markdown('<div class="movie-card">', unsafe_allow_html=True)
+                    st.image(posters[i], caption=names[i])
+                    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("""
 <div style='text-align:center; margin-top:40px; color:#aaa'>
