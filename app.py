@@ -3,26 +3,8 @@ import pickle
 import requests
 import time
 import os
-
-# ---------------- Drive File Config ----------------
-DRIVE_SIM_ID = "1ZDR3c89SGin1S0pD9ntDjDFcB29U5qxi"
-DRIVE_SIM_URL = f"https://drive.google.com/uc?id={DRIVE_SIM_ID}"
-
-def download_from_drive(url, out_path):
-    """Download file from Google Drive if not already present."""
-    if os.path.exists(out_path):
-        return
-    st.write("⬇️ Downloading similarity.pkl from Google Drive...")
-    resp = requests.get(url, stream=True)
-    resp.raise_for_status()
-    with open(out_path, "wb") as f:
-        for chunk in resp.iter_content(chunk_size=8192):
-            if chunk:
-                f.write(chunk)
-    st.success("✅ similarity.pkl downloaded successfully!")
-
-# Download similarity.pkl if missing
-download_from_drive(DRIVE_SIM_URL, "similarity.pkl")
+import gzip
+import io
 
 # ---------------- Page Config ----------------
 st.set_page_config(
@@ -123,15 +105,21 @@ def fetch_poster(movie_id, movie_name=None, session=None):
     except requests.exceptions.RequestException:
         return "https://via.placeholder.com/500x750.png?text=Error"
 
-# ---------------- Recommendation Logic ----------------
+# ---------------- Safe Data Loader ----------------
 @st.cache_data(show_spinner=False)
 def load_data():
-    movies = pickle.load(open('movie_list.pkl', 'rb'))
-    similarity = pickle.load(open('similarity.pkl', 'rb'))
+    with open('movie_list.pkl', 'rb') as f:
+        movies = pickle.load(f)
+
+    with gzip.open('similarity.pkl.gz', 'rb') as f:
+        data = f.read()
+        similarity = pickle.load(io.BytesIO(data))
+
     return movies, similarity
 
 movies, similarity = load_data()
 
+# ---------------- Recommendation Logic ----------------
 def recommend(movie):
     index = movies[movies['title'] == movie].index[0]
     distances = sorted(
