@@ -1,0 +1,28 @@
+# Python cache & virtual environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# Streamlit logs & configs
+.streamlit/
+logs/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# Model / data backups (agar large ho)
+*.pkl
+!movie_list.pkl
+!similarity.pkl
