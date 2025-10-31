@@ -2,6 +2,27 @@ import streamlit as st
 import pickle
 import requests
 import time
+import os
+
+# ---------------- Drive File Config ----------------
+DRIVE_SIM_ID = "1ZDR3c89SGin1S0pD9ntDjDFcB29U5qxi"
+DRIVE_SIM_URL = f"https://drive.google.com/uc?id={DRIVE_SIM_ID}"
+
+def download_from_drive(url, out_path):
+    """Download file from Google Drive if not already present."""
+    if os.path.exists(out_path):
+        return
+    st.write("⬇️ Downloading similarity.pkl from Google Drive...")
+    resp = requests.get(url, stream=True)
+    resp.raise_for_status()
+    with open(out_path, "wb") as f:
+        for chunk in resp.iter_content(chunk_size=8192):
+            if chunk:
+                f.write(chunk)
+    st.success("✅ similarity.pkl downloaded successfully!")
+
+# Download similarity.pkl if missing
+download_from_drive(DRIVE_SIM_URL, "similarity.pkl")
 
 # ---------------- Page Config ----------------
 st.set_page_config(
@@ -19,15 +40,10 @@ st.markdown("""
         --accent-glow: #ff4d4d;
         --text-light: #eee;
     }
-
-    /* Background */
     [data-testid="stAppViewContainer"] {
         background: linear-gradient(160deg, #000000, #0d0d0d, #1a1a1a);
-        transition: all 0.4s ease;
         color: var(--text-light);
     }
-
-    /* Title */
     h1 {
         text-align: center;
         background: linear-gradient(90deg, #ff0000, #ff6a00, #ffffff);
@@ -37,13 +53,6 @@ st.markdown("""
         font-size: 2.8rem;
         margin-bottom: 5px;
     }
-
-    /* Animated Signature */
-    @keyframes glow {
-        0% { color: #ff3333; text-shadow: 0 0 10px #ff0000; }
-        50% { color: #ff6a00; text-shadow: 0 0 20px #ff6a00; }
-        100% { color: #ff3333; text-shadow: 0 0 10px #ff0000; }
-    }
     .animated-name {
         font-size: 20px;
         font-weight: bold;
@@ -51,30 +60,18 @@ st.markdown("""
         animation: glow 3s infinite;
         margin-bottom: 30px;
     }
-
-    /* Floating Search Bar */
-    .search-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-bottom: 30px;
-        position: relative;
+    @keyframes glow {
+        0% { color: #ff3333; text-shadow: 0 0 10px #ff0000; }
+        50% { color: #ff6a00; text-shadow: 0 0 20px #ff6a00; }
+        100% { color: #ff3333; text-shadow: 0 0 10px #ff0000; }
     }
-
     div[data-testid="stTextInput"] {
         background: rgba(255,255,255,0.05);
         border-radius: 12px !important;
         box-shadow: 0 0 15px rgba(255,0,0,0.3);
-        transition: all 0.3s ease;
         width: 60% !important;
+        margin: auto;
     }
-
-    div[data-testid="stTextInput"]:hover {
-        box-shadow: 0 0 25px rgba(255,0,0,0.6);
-        transform: scale(1.02);
-    }
-
-    /* Search Button */
     div[data-testid="stButton"] > button {
         background: linear-gradient(90deg, #ff0000, #ff6a00);
         color: white;
@@ -83,62 +80,10 @@ st.markdown("""
         transition: all 0.3s ease;
         border: none;
     }
-
     div[data-testid="stButton"] > button:hover {
         transform: scale(1.05);
         box-shadow: 0 0 20px #ff0000;
     }
-
-    /* Search loader */
-    .searching {
-        display: flex;
-        justify-content: center;
-        margin: 20px 0;
-    }
-    .search-icon {
-        width: 45px;
-        height: 45px;
-        border: 3px solid #ff3333;
-        border-radius: 50%;
-        position: relative;
-        animation: spin 2s linear infinite;
-    }
-    .search-icon::after {
-        content: '';
-        position: absolute;
-        width: 15px;
-        height: 3px;
-        background: #ff3333;
-        top: 27px;
-        left: 33px;
-        transform: rotate(45deg);
-        border-radius: 2px;
-    }
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-
-    /* Movie Reel Animation */
-    .reel {
-        display: flex;
-        justify-content: center;
-        margin: 15px 0;
-    }
-    .reel-wheel {
-        width: 50px;
-        height: 50px;
-        border: 5px dotted #ff3333;
-        border-radius: 50%;
-        margin: 0 8px;
-        animation: roll 3s linear infinite;
-    }
-    @keyframes roll {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-    }
-
-    /* Movie cards */
     .movie-card {
         border-radius: 15px;
         padding: 10px;
@@ -149,31 +94,6 @@ st.markdown("""
     .movie-card:hover {
         transform: translateY(-6px) scale(1.03);
         box-shadow: 0 8px 25px rgba(255, 0, 0, 0.4);
-    }
-
-    /* Footer */
-    .footer {
-        text-align: center;
-        margin-top: 50px;
-        font-size: 15px;
-        color: #888;
-        position: relative;
-    }
-    .footer::before {
-        content: "";
-        position: absolute;
-        top: -15px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 200px;
-        height: 4px;
-        border-radius: 5px;
-        background: linear-gradient(90deg, #ff0000, #ff6a00, #ffcc00);
-        animation: moveLine 3s linear infinite;
-    }
-    @keyframes moveLine {
-        0% { background-position: 0% }
-        100% { background-position: 100% }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -200,11 +120,18 @@ def fetch_poster(movie_id, movie_name=None, session=None):
             return "https://image.tmdb.org/t/p/w500" + poster_path
         else:
             return "https://via.placeholder.com/500x750.png?text=No+Image"
-
     except requests.exceptions.RequestException:
         return "https://via.placeholder.com/500x750.png?text=Error"
 
 # ---------------- Recommendation Logic ----------------
+@st.cache_data(show_spinner=False)
+def load_data():
+    movies = pickle.load(open('movie_list.pkl', 'rb'))
+    similarity = pickle.load(open('similarity.pkl', 'rb'))
+    return movies, similarity
+
+movies, similarity = load_data()
+
 def recommend(movie):
     index = movies[movies['title'] == movie].index[0]
     distances = sorted(
@@ -231,21 +158,11 @@ def recommend(movie):
 st.title("🎥 Movie Recommender System")
 st.markdown('<div class="animated-name">✨ Built by Shubham Kumar ✨</div>', unsafe_allow_html=True)
 
-# Movie Reel Animation
-st.markdown('<div class="reel"><div class="reel-wheel"></div><div class="reel-wheel"></div><div class="reel-wheel"></div></div>', unsafe_allow_html=True)
-
-movies = pickle.load(open('movie_list.pkl', 'rb'))
-similarity = pickle.load(open('similarity.pkl', 'rb'))
-
 movie_list = movies['title'].values
-
-# Floating Search
-st.markdown('<div class="search-container"></div>', unsafe_allow_html=True)
-selected_movie = st.selectbox("🎬 Type or select a movie", movie_list, label_visibility="collapsed")
+selected_movie = st.selectbox("🎬 Type or select a movie", movie_list)
 
 if st.button('Show Recommendation 🎞️'):
-    st.markdown('<div class="searching"><div class="search-icon"></div></div>', unsafe_allow_html=True)
-    with st.spinner('🍿 Fetching premium recommendations...'):
+    with st.spinner('🍿 Fetching recommendations...'):
         names, posters = recommend(selected_movie)
         cols = st.columns(5)
         for i in range(5):
@@ -254,10 +171,9 @@ if st.button('Show Recommendation 🎞️'):
                 st.image(posters[i], caption=names[i])
                 st.markdown('</div>', unsafe_allow_html=True)
 
-# Footer
 st.markdown("""
-<div class='footer'>
-    🚀 Made with ❤️ by <b>Shubham Kumar</b><br>
-    <small>© 2025 Movie Recommender | Streamlit</small>
+<div style='text-align:center; margin-top:40px; color:#aaa'>
+🚀 Made with ❤️ by <b>Shubham Kumar</b><br>
+<small>© 2025 Movie Recommender | Streamlit</small>
 </div>
 """, unsafe_allow_html=True)
